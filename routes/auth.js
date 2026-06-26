@@ -27,22 +27,24 @@ const authLimiter = rateLimit({
 // Syötteen validointi - sallitaan vain turvalliset merkit
 // Käyttäjätunnus: 3-20 merkkiä, vain kirjaimet, numerot, alaviiva
 function validateUsername(username) {
-  if (typeof username !== 'string') return false;
-  return /^[a-zA-Z0-9_]{3,20}$/.test(username);
+  if (typeof username !== 'string') return false; // pitää olla merkkijono
+  return /^[a-zA-Z0-9_]{3,20}$/.test(username);   // sallitut merkit ja pituus
 }
 
 // Salasana: vähintään 8 merkkiä, enintään 100 (estää liian pitkät hyökkäykset)
+// Käytetään VAIN rekisteröinnissä, ei loginissa
 function validatePassword(password) {
-  if (typeof password !== 'string') return false;
-  return password.length >= 8 && password.length <= 100;
+  if (typeof password !== 'string') return false; // pitää olla merkkijono
+  return password.length >= 8 && password.length <= 100; // pituusrajat
 }
 
 // ---- REKISTERÖINTI ----
 router.post('/register', authLimiter, async (req, res) => {
   try {
+    // Lue käyttäjätunnus ja salasana rungosta
     const { username, password } = req.body;
 
-    // Validoi käyttäjätunnus
+    // Validoi käyttäjätunnuksen muoto
     if (!validateUsername(username)) {
       return res.status(400).json({
         success: false,
@@ -50,7 +52,7 @@ router.post('/register', authLimiter, async (req, res) => {
       });
     }
 
-    // Validoi salasana
+    // Validoi salasanan pituus (vähintään 8 merkkiä)
     if (!validatePassword(password)) {
       return res.status(400).json({
         success: false,
@@ -67,19 +69,20 @@ router.post('/register', authLimiter, async (req, res) => {
       });
     }
 
-    // Hashaa salasana - 12 kierrosta
+    // Hashaa salasana - 12 kierrosta, alkuperäistä ei tallenneta
     const passwordHash = await bcrypt.hash(password, 12);
 
-    // Luo käyttäjä
+    // Luo käyttäjä kantaan
     const user = await User.create({
       username: username.toLowerCase(),
       passwordHash,
     });
 
-    // Luo token ja kirjaa sisään suoraan
+    // Luo token ja kirjaa käyttäjä sisään suoraan
     const token = createToken(user);
     setTokenCookie(res, token);
 
+    // Palauta onnistuminen ja käyttäjän perustiedot
     res.status(201).json({
       success: true,
       user: { username: user.username, role: user.role },
@@ -93,10 +96,13 @@ router.post('/register', authLimiter, async (req, res) => {
 // ---- KIRJAUTUMINEN ----
 router.post('/login', authLimiter, async (req, res) => {
   try {
+    // Lue käyttäjätunnus ja salasana rungosta
     const { username, password } = req.body;
 
-    // Validoi syötteet jo ennen kantakyselyä
-    if (!validateUsername(username) || !validatePassword(password)) {
+    // Validoi vain käyttäjätunnuksen muoto ennen kantakyselyä
+    // Salasanan pituutta EI käytetä porttina, jotta myös lyhyet väärät
+    // yritykset kasvattavat lukkolaskuria olemassa olevalle tunnukselle
+    if (!validateUsername(username) || typeof password !== 'string' || password.length === 0) {
       // Geneerinen viesti - ei paljasteta mikä meni vikaan
       return res.status(401).json({
         success: false,
@@ -104,7 +110,7 @@ router.post('/login', authLimiter, async (req, res) => {
       });
     }
 
-    // Hae käyttäjä
+    // Hae käyttäjä kannasta
     const user = await User.findOne({ username: username.toLowerCase() });
 
     // Jos käyttäjää ei ole, palauta geneerinen viesti
@@ -116,7 +122,7 @@ router.post('/login', authLimiter, async (req, res) => {
       });
     }
 
-    // Tarkista onko tili lukossa
+    // Tarkista onko tili tällä hetkellä lukossa
     if (user.isLocked()) {
       // Geneerinen viesti - ei kerrota tarkkaa lukkoaikaa
       return res.status(423).json({
@@ -125,36 +131,40 @@ router.post('/login', authLimiter, async (req, res) => {
       });
     }
 
-    // Vertaa salasanaa hashiin
+    // Vertaa annettua salasanaa tallennettuun hashiin
     const match = await bcrypt.compare(password, user.passwordHash);
 
+    // Väärä salasana
     if (!match) {
       // Kasvata epäonnistuneiden yritysten määrää
       user.failedLoginAttempts += 1;
 
-      // Jos raja täyttyi, lukitse tili
+      // Jos raja täyttyi, lukitse tili määräajaksi
       if (user.failedLoginAttempts >= MAX_ATTEMPTS) {
         user.lockUntil = new Date(Date.now() + LOCK_MINUTES * 60 * 1000);
         user.failedLoginAttempts = 0; // nollaa laskuri lukon ajaksi
       }
 
+      // Tallenna muutokset kantaan
       await user.save();
 
+      // Geneerinen virheviesti
       return res.status(401).json({
         success: false,
         message: 'Virheellinen käyttäjätunnus tai salasana',
       });
     }
 
-    // Onnistunut kirjautuminen - nollaa laskuri ja lukko
+    // Onnistunut kirjautuminen - nollaa laskuri ja mahdollinen lukko
     user.failedLoginAttempts = 0;
     user.lockUntil = null;
     await user.save();
 
-    // Luo token
+    // Luo token ja aseta eväste
     const token = createToken(user);
     setTokenCookie(res, token);
 
+    // Palauta onnistuminen ja käyttäjän perustiedot
     res.json({
       success: true,
       user: { username: user.username, role: user.role },
@@ -167,9 +177,35 @@ router.post('/login', authLimiter, async (req, res) => {
 
 // ---- ULOSKIRJAUTUMINEN ----
 router.post('/logout', (req, res) => {
-  // Tyhjennä evästeestä token
-  res.clearCookie('token');
+  // Poista token-eväste samoilla asetuksilla kuin se luotiin
+  // Muuten selain ei välttämättä poista evästettä
+  const isProd = process.env.NODE_ENV === 'production';
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
+  });
+  // Palauta onnistuminen
   res.json({ success: true });
+});
+
+// ---- KUKA ON KIRJAUTUNUT ----
+// Frontti kutsuu tätä saadakseen kirjautuneen käyttäjän tiedot
+const requireAuth = require('../middleware/requireAuth');
+
+router.get('/me', requireAuth, async (req, res) => {
+  try {
+    // Hae käyttäjä id:n perusteella, ei palauteta salasanahashia
+    const user = await User.findById(req.user.id).select('username role');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Käyttäjää ei löytynyt' });
+    }
+    // Palauta perustiedot
+    res.json({ success: true, user: { username: user.username, role: user.role } });
+  } catch (error) {
+    console.error('Me-reitin virhe:', error);
+    res.status(500).json({ success: false, message: 'Palvelinvirhe' });
+  }
 });
 
 module.exports = router;
