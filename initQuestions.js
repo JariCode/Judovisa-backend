@@ -5,7 +5,7 @@
 
 require('dotenv').config();
 const mongoose = require('mongoose');
-const Question = require('./models/Question');
+const Question = require('./models/question');
 
 const QUESTIONS = [
   {
