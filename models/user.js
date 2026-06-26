@@ -17,7 +17,15 @@ const userSchema = new mongoose.Schema(
       minlength: [3, 'Käyttäjätunnus vähintään 3 merkkiä'],
       maxlength: [20, 'Käyttäjätunnus enintään 20 merkkiä'],
     },
-    // Salasanan hash - alkuperäistä salasanaa ei tallenneta koskaan
+    // Näyttönimi - näytetään käyttöliittymässä käyttäjän kirjoittamassa muodossa
+    displayName: {
+      type: String,
+      required: [true, 'Näyttönimi vaaditaan'],
+      trim: true,
+      minlength: [3, 'Näyttönimi vähintään 3 merkkiä'],
+      maxlength: [20, 'Näyttönimi enintään 20 merkkiä'],
+    },
+        // Salasanan hash - alkuperäistä salasanaa ei tallenneta koskaan
     passwordHash: {
       type: String,
       required: true,

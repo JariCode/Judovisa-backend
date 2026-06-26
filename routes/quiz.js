@@ -98,7 +98,7 @@ router.post('/score', requireAuth, async (req, res) => {
     }
 
     // Hae käyttäjänimi tallennusta varten
-    const user = await User.findById(req.user.id).select('username');
+    const user = await User.findById(req.user.id).select('displayName');
     if (!user) {
       return res.status(404).json({ success: false, message: 'Käyttäjää ei löytynyt' });
     }
@@ -106,7 +106,7 @@ router.post('/score', requireAuth, async (req, res) => {
     // Luo ja tallenna pistetietue
     const score = await Score.create({
       userId: req.user.id,
-      username: user.username,
+      displayName: user.displayName,
       correct,
       wrong,
       totalQuestions,
@@ -140,7 +140,7 @@ router.get('/top10', requireAuth, async (req, res) => {
       {
         $group: {
           _id: '$userId',
-          username: { $first: '$username' },
+          displayName: { $first: '$displayName' },
           bestScore: { $first: '$correct' },
           bestPercentage: { $first: '$percentage' },
         },

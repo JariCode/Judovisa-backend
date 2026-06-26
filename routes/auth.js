@@ -75,6 +75,7 @@ router.post('/register', authLimiter, async (req, res) => {
     // Luo käyttäjä kantaan
     const user = await User.create({
       username: username.toLowerCase(),
+      displayName: username,
       passwordHash,
     });
 
@@ -85,7 +86,7 @@ router.post('/register', authLimiter, async (req, res) => {
     // Palauta onnistuminen ja käyttäjän perustiedot
     res.status(201).json({
       success: true,
-      user: { username: user.username, role: user.role },
+      user: { username: user.username, role: user.role, displayName: user.displayName },
     });
   } catch (error) {
     console.error('Rekisteröintivirhe:', error);
@@ -167,7 +168,7 @@ router.post('/login', authLimiter, async (req, res) => {
     // Palauta onnistuminen ja käyttäjän perustiedot
     res.json({
       success: true,
-      user: { username: user.username, role: user.role },
+      user: { username: user.username, role: user.role, displayName: user.displayName },
     });
   } catch (error) {
     console.error('Kirjautumisvirhe:', error);
@@ -196,12 +197,12 @@ const requireAuth = require('../middleware/requireAuth');
 router.get('/me', requireAuth, async (req, res) => {
   try {
     // Hae käyttäjä id:n perusteella, ei palauteta salasanahashia
-    const user = await User.findById(req.user.id).select('username role');
+    const user = await User.findById(req.user.id).select('username role displayName');
     if (!user) {
       return res.status(404).json({ success: false, message: 'Käyttäjää ei löytynyt' });
     }
     // Palauta perustiedot
-    res.json({ success: true, user: { username: user.username, role: user.role } });
+    res.json({ success: true, user: { username: user.username, role: user.role, displayName: user.displayName } });
   } catch (error) {
     console.error('Me-reitin virhe:', error);
     res.status(500).json({ success: false, message: 'Palvelinvirhe' });

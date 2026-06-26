@@ -14,7 +14,7 @@ const scoreSchema = new mongoose.Schema(
       index: true, // nopea haku käyttäjän pisteisiin
     },
     // Käyttäjänimi tallennetaan myös tähän, jotta Top 10 ei vaadi erillistä hakua
-    username: {
+    displayName: {
       type: String,
       required: true,
     },
