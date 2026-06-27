@@ -37,6 +37,7 @@ app.use(cookieParser());
 app.use('/api/auth', authRoutes);
 app.use('/api/quiz', quizRoutes);
 app.use('/api/profile', profileRoutes);
+
 // Terveystarkistus
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'Palvelin toiminnassa' });

@@ -124,7 +124,15 @@ router.delete('/delete-account', requireAuth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Käyttäjää ei löytynyt' });
     }
 
-    // Varmistetaan salasana ennen radikaalia tuhoamista
+    // TURVALLISUUSTARKISTUS: Admin ei voi poistaa omaa tiliään profiilisivulta
+    if (user.role === 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Järjestelmänvalvoja (Admin) ei voi poistaa omaa tiliään profiilisivun kautta.' 
+      });
+    }
+
+    // Varmistetaan salasana ennen poistoa
     const match = await bcrypt.compare(password, user.passwordHash);
     if (!match) {
       return res.status(401).json({ success: false, message: 'Salasana on virheellinen' });
@@ -136,7 +144,7 @@ router.delete('/delete-account', requireAuth, async (req, res) => {
     // Poistetaan itse käyttäjätili
     await User.findByIdAndDelete(user._id);
 
-    // Tyhjennetään token-eväste selaimesta välittömästi (täysin samoilla asetuksilla)
+    // Tyhjennetään token-eväste selaimesta välittömästi
     const isProd = process.env.NODE_ENV === 'production';
     res.clearCookie('token', {
       httpOnly: true,
