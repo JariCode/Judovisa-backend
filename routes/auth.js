@@ -7,6 +7,7 @@ const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const User = require('../models/user');
 const { createToken, setTokenCookie } = require('../utils/tokenUtils');
+const logEvent = require('../utils/logger');
 
 const router = express.Router();
 
@@ -78,6 +79,9 @@ router.post('/register', authLimiter, async (req, res) => {
       displayName: username,
       passwordHash,
     });
+
+    // LISÄTTY: Lokitetaan uusi rekisteröinti
+    await logEvent('REGISTER', user, 'Rekisteröityi uutena pelaajana sovellukseen.');
 
     // Luo token ja kirjaa käyttäjä sisään suoraan
     const token = createToken(user);
@@ -161,6 +165,9 @@ router.post('/login', authLimiter, async (req, res) => {
     user.lockUntil = null;
     await user.save();
 
+    // LISÄTTY: Lokitetaan onnistunut sisäänkirjautuminen
+    await logEvent('LOGIN', user, 'Kirjautui sisään järjestelmään.');
+
     // Luo token ja aseta eväste
     const token = createToken(user);
     setTokenCookie(res, token);
@@ -177,23 +184,35 @@ router.post('/login', authLimiter, async (req, res) => {
 });
 
 // ---- ULOSKIRJAUTUMINEN ----
-router.post('/logout', (req, res) => {
-  // Poista token-eväste samoilla asetuksilla kuin se luotiin
-  // Muuten selain ei välttämättä poista evästettä
-  const isProd = process.env.NODE_ENV === 'production';
-  res.clearCookie('token', {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? 'none' : 'lax',
-  });
-  // Palauta onnistuminen
-  res.json({ success: true });
+// LISÄTTY: requireAuth tähän reittiin, jotta saadaan req.user lokitusta varten
+const requireAuth = require('../middleware/requireAuth');
+
+router.post('/logout', requireAuth, async (req, res) => {
+  try {
+    // LISÄTTY: Haetaan täydet tiedot ja lokitetaan ennen evästeen poistoa
+    const user = await User.findById(req.user.id);
+    if (user) {
+      await logEvent('LOGOUT', user, 'Kirjautui ulos järjestelmästä.');
+    }
+
+    // Poista token-eväste samoilla asetuksilla kuin se luotiin
+    // Muuten selain ei välttämättä poista evästettä
+    const isProd = process.env.NODE_ENV === 'production';
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+    });
+    // Palauta onnistuminen
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Uloskirjautumisvirhe:', error);
+    res.status(500).json({ success: false, message: 'Palvelinvirhe' });
+  }
 });
 
 // ---- KUKA ON KIRJAUTUNUT ----
 // Frontti kutsuu tätä saadakseen kirjautuneen käyttäjän tiedot
-const requireAuth = require('../middleware/requireAuth');
-
 router.get('/me', requireAuth, async (req, res) => {
   try {
     // Hae käyttäjä id:n perusteella, ei palauteta salasanahashia

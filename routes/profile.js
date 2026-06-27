@@ -8,6 +8,7 @@ const User = require('../models/user');
 const Score = require('../models/score');
 const requireAuth = require('../middleware/requireAuth');
 const { createToken, setTokenCookie } = require('../utils/tokenUtils');
+const logEvent = require('../utils/logger');
 
 const router = express.Router();
 
@@ -52,12 +53,16 @@ router.put('/update-username', requireAuth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Käyttäjää ei löytynyt' });
     }
 
+    const oldDisplayName = user.displayName;
     user.username = lowerName;
     user.displayName = newUsername;
     await user.save();
 
     // Päivitetään myös Score-tauluun uusi displayName, jotta Top 10 pysyy ajan tasalla lennosta
     await Score.updateMany({ userId: user._id }, { displayName: user.displayName });
+
+    // LISÄTTY: Lokitetaan tunnuksen muutos
+    await logEvent('UPDATE_USERNAME', user, `Muutti käyttäjätunnuksekseen: ${oldDisplayName} -> ${newUsername}`);
 
     // Luodaan uusi JWT-token ja asetetaan uusi eväste
     const token = createToken(user);
@@ -103,6 +108,9 @@ router.put('/change-password', requireAuth, async (req, res) => {
     user.passwordHash = await bcrypt.hash(newPassword, 12);
     await user.save();
 
+    // LISÄTTY: Lokitetaan salasanan vaihto
+    await logEvent('CHANGE_PASSWORD', user, 'Vaihtoi tilinsä salasanan.');
+
     res.json({ success: true, message: 'Salasana vaihdettu onnistuneesti' });
   } catch (error) {
     console.error('Salasanan vaihtovirhe:', error);
@@ -126,9 +134,9 @@ router.delete('/delete-account', requireAuth, async (req, res) => {
 
     // TURVALLISUUSTARKISTUS: Admin ei voi poistaa omaa tiliään profiilisivulta
     if (user.role === 'admin') {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Järjestelmänvalvoja (Admin) ei voi poistaa omaa tiliään profiilisivun kautta.' 
+      return res.status(403).json({
+        success: false,
+        message: 'Järjestelmänvalvoja (Admin) ei voi poistaa omaa tiliään profiilisivun kautta.'
       });
     }
 
@@ -137,6 +145,9 @@ router.delete('/delete-account', requireAuth, async (req, res) => {
     if (!match) {
       return res.status(401).json({ success: false, message: 'Salasana on virheellinen' });
     }
+
+    // LISÄTTY: Lokitetaan oman tilin poisto ennen tuhoamista
+    await logEvent('DELETE_ACCOUNT', user, 'Poisti oman käyttäjätilinsä ja kaikki pelituloksensa pysyvästi.');
 
     // Poistetaan kaikki käyttäjän suorittamat pelitulokset Score-kannasta
     await Score.deleteMany({ userId: user._id });
