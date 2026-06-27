@@ -9,6 +9,7 @@ const cookieParser = require('cookie-parser');
 
 const authRoutes = require('./routes/auth');
 const quizRoutes = require('./routes/quiz');
+const profileRoutes = require('./routes/profile');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -16,8 +17,8 @@ const PORT = process.env.PORT || 5000;
 // Render ja muut proxyt - luota proxyyn jotta IP saadaan oikein rate-limitiä varten
 app.set('trust proxy', 1);
 
-// CORS - sallitaan vain määritellyt originit, evästeet mukaan
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5500')
+// CORS - sallitaan vain määritellyt originit, evästeet mukaan. Haetaan environmetistä ALLOWED_ORIGINS.
+const allowedOrigins = process.env.ALLOWED_ORIGINS
   .split(',')
   .map((o) => o.trim());
 
@@ -35,7 +36,7 @@ app.use(cookieParser());
 // Reitit
 app.use('/api/auth', authRoutes);
 app.use('/api/quiz', quizRoutes);
-
+app.use('/api/profile', profileRoutes);
 // Terveystarkistus
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'Palvelin toiminnassa' });
