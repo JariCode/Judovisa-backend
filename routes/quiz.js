@@ -3,6 +3,7 @@
 // Oikeita vastauksia ei koskaan lähetetä frontendiin
 
 const express = require('express');
+const mongoose = require('mongoose'); // LISÄTTY: Tarvitaan id-muodon validointiin NoSQL-injektioita vastaan
 const Question = require('../models/Question');
 const Score = require('../models/score');
 const User = require('../models/user');
@@ -60,6 +61,11 @@ router.post('/check', requireAuth, async (req, res) => {
       return res.status(400).json({ success: false, message: 'questionId ja given vaaditaan' });
     }
 
+    // TURVALLISUUSKORJAUS: Estetään NoSQL-injektio tarkistamalla, että ID on muodollisesti oikea MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(questionId)) {
+      return res.status(400).json({ success: false, message: 'Virheellinen questionId-muoto' });
+    }
+
     // Hae kysymys vastauksineen
     const q = await Question.findById(questionId).lean();
     if (!q || !q.isActive) {
@@ -95,6 +101,11 @@ router.post('/score', requireAuth, async (req, res) => {
       typeof totalQuestions !== 'number' || totalQuestions <= 0
     ) {
       return res.status(400).json({ success: false, message: 'Virheelliset pisteet' });
+    }
+
+    // TURVALLISUUSKORJAUS: Estetään konsolihuijaaminen (oikeat vastaukset eivät voi ylittää kokonaiskysymysten määrää)
+    if (correct > totalQuestions) {
+      return res.status(400).json({ success: false, message: 'Luvattoman korkeat pisteet' });
     }
 
     // Hae käyttäjänimi tallennusta varten
