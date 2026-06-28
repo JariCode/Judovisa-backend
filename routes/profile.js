@@ -4,6 +4,7 @@
 
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const mongoose = require('mongoose'); // LISÄTTY: Tarvitaan id-muodon validointiin NoSQL-injektioita vastaan
 const User = require('../models/user');
 const Score = require('../models/score');
 const requireAuth = require('../middleware/requireAuth');
@@ -34,6 +35,11 @@ router.put('/update-username', requireAuth, async (req, res) => {
         success: false,
         message: 'Käyttäjätunnus: 3-20 merkkiä, vain kirjaimet, numerot ja alaviiva',
       });
+    }
+
+    // TURVALLISUUSKORJAUS: Varmistetaan id-rakenne ennen kantakyselyä NoSQL-injektioita vastaan
+    if (!req.user || !mongoose.Types.ObjectId.isValid(req.user.id)) {
+      return res.status(400).json({ success: false, message: 'Virheellinen tunnistemuoto' });
     }
 
     const lowerName = newUsername.toLowerCase();
@@ -92,6 +98,11 @@ router.put('/change-password', requireAuth, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Uusi salasana: vähintään 8 merkkiä' });
     }
 
+    // TURVALLISUUSKORJAUS: Varmistetaan id-rakenne ennen kantakyselyä NoSQL-injektioita vastaan
+    if (!req.user || !mongoose.Types.ObjectId.isValid(req.user.id)) {
+      return res.status(400).json({ success: false, message: 'Virheellinen tunnistemuoto' });
+    }
+
     // Haetaan käyttäjä kannasta salasanahashin kanssa
     const user = await User.findById(req.user.id);
     if (!user) {
@@ -125,6 +136,11 @@ router.delete('/delete-account', requireAuth, async (req, res) => {
 
     if (!password) {
       return res.status(400).json({ success: false, message: 'Salasana vaaditaan tilin poistamiseksi' });
+    }
+
+    // TURVALLISUUSKORJAUS: Varmistetaan id-rakenne ennen kantakyselyä NoSQL-injektioita vastaan
+    if (!req.user || !mongoose.Types.ObjectId.isValid(req.user.id)) {
+      return res.status(400).json({ success: false, message: 'Virheellinen tunnistemuoto' });
     }
 
     const user = await User.findById(req.user.id);
