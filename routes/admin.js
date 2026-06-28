@@ -189,4 +189,95 @@ router.post('/questions', async (req, res) => {
   }
 });
 
+// ---- 6. HAE KAIKKI KYSYMYKSET (Mukaan lukien oikeat vastaukset adminille) ----
+// Reitti: GET /api/admin/questions
+router.get('/questions', async (req, res) => {
+  try {
+    // Haetaan kaikki kysymykset ja lajitellaan ne kategorian mukaan aakkosjärjestykseen
+    const questions = await Question.find({}).sort({ category: 1, type: 1 });
+    res.json({ success: true, questions });
+  } catch (error) {
+    console.error('Kysymyslistan haku epäonnistui:', error);
+    res.status(500).json({ success: false, message: 'Palvelinvirhe kysymyksiä haettaessa.' });
+  }
+});
+
+// ---- 7. POISTA KYSYMYS PYSYVÄSTI KANNASTA ----
+// Reitti: DELETE /api/admin/questions/:id
+router.delete('/questions/:id', async (req, res) => {
+  try {
+    const questionId = req.params.id;
+
+    // Tarkistetaan id:n muoto NoSQL-injektioiden varalta
+    if (!mongoose.Types.ObjectId.isValid(questionId)) {
+      return res.status(400).json({ success: false, message: 'Virheellinen kysymys-id' });
+    }
+
+    const question = await Question.findById(questionId);
+    if (!question) {
+      return res.status(404).json({ success: false, message: 'Kysymystä ei löytynyt.' });
+    }
+
+    // Haetaan adminin tiedot lokitusta varten
+    const adminUser = await User.findById(req.user.id);
+
+    // Poistetaan kysymys
+    await Question.findByIdAndDelete(questionId);
+
+    // Luodaan lokimerkintä poistosta
+    await logEvent(
+      'QUESTION_DELETE', 
+      adminUser, 
+      `Poisti kysymyksen "${question.questionText}" (tunniste: ${question.type}) kategoriasta ${question.category}.`
+    );
+
+    res.json({ success: true, message: `Kysymys "${question.type}" poistettu onnistuneesti.` });
+  } catch (error) {
+    console.error('Kysymyksen poistovirhe:', error);
+    res.status(500).json({ success: false, message: 'Palvelinvirhe kysymystä poistettaessa.' });
+  }
+});
+
+// ---- 8. LISÄTTY: PÄIVITÄ OLEMASSA OLEVA KYSYMYS ----
+// Reitti: PUT /api/admin/questions/:id
+router.put('/questions/:id', async (req, res) => {
+  try {
+    const questionId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(questionId)) {
+      return res.status(400).json({ success: false, message: 'Virheellinen kysymys-id' });
+    }
+
+    const updatedQuestion = await Question.findByIdAndUpdate(
+      questionId,
+      {
+        type: req.body.type.toLowerCase().trim(),
+        category: req.body.category.trim(),
+        jpName: req.body.jpName ? req.body.jpName.trim() : undefined,
+        questionText: req.body.questionText.trim(),
+        attempts: parseInt(req.body.attempts, 10) || 1,
+        answers: req.body.answers,
+        options: req.body.options && req.body.options.length > 0 ? req.body.options : undefined
+      },
+      { new: true }
+    );
+
+    if (!updatedQuestion) {
+      return res.status(404).json({ success: false, message: 'Kysymystä ei löytynyt.' });
+    }
+
+    const adminUser = await User.findById(req.user.id);
+    await logEvent(
+      'QUESTION_UPDATE',
+      adminUser,
+      `Muokkasi kysymystä "${updatedQuestion.type}" (kategoria: ${updatedQuestion.category}).`
+    );
+
+    res.json({ success: true, message: 'Kysymys päivitetty onnistuneesti!', question: updatedQuestion });
+  } catch (error) {
+    console.error('Kysymyksen muokkausvirhe:', error);
+    res.status(500).json({ success: false, message: 'Palvelinvirhe kysymystä muokatessa.' });
+  }
+});
+
 module.exports = router;
