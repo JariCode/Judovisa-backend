@@ -3,6 +3,7 @@
 // Suojattu requireAuth ja requireAdmin -middlewareilla
 
 const express = require('express');
+const mongoose = require('mongoose'); // LISÄTTY: Tarvitaan id-muodon validointiin NoSQL-injektioita vastaan URL-parametreissa
 const User = require('../models/user');
 const Score = require('../models/score');
 const requireAuth = require('../middleware/requireAuth');
@@ -32,6 +33,11 @@ router.get('/users', async (req, res) => {
 router.put('/users/:id/toggle-role', async (req, res) => {
   try {
     const targetId = req.params.id;
+
+    // TURVALLISUUSKORJAUS: Estetään NoSQL-injektio URL-parametrissa tarkistamalla ID-muoto ennen kantakyselyä
+    if (!mongoose.Types.ObjectId.isValid(targetId)) {
+      return res.status(400).json({ success: false, message: 'Virheellinen käyttäjä-id' });
+    }
 
     // ITSE SUOJELUVAISTO: Admin ei voi muuttaa omaa rooliaan
     if (targetId === req.user.id) {
@@ -71,6 +77,11 @@ router.put('/users/:id/toggle-role', async (req, res) => {
 router.delete('/users/:id', async (req, res) => {
   try {
     const targetId = req.params.id;
+
+    // TURVALLISUUSKORJAUS: Estetään NoSQL-injektio URL-parametrissa tarkistamalla ID-muoto ennen kantakyselyä
+    if (!mongoose.Types.ObjectId.isValid(targetId)) {
+      return res.status(400).json({ success: false, message: 'Virheellinen käyttäjä-id' });
+    }
 
     // ITSE SUOJELUVAISTO: Admin ei voi poistaa itseään hallintasivulta
     if (targetId === req.user.id) {
