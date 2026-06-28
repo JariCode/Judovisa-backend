@@ -5,6 +5,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
+const mongoose = require('mongoose'); // LISÄTTY: Tarvitaan id-muodon validointiin NoSQL-injektioita vastaan me/logout-reiteissä
 const User = require('../models/user');
 const { createToken, setTokenCookie } = require('../utils/tokenUtils');
 const logEvent = require('../utils/logger');
@@ -189,6 +190,11 @@ const requireAuth = require('../middleware/requireAuth');
 
 router.post('/logout', requireAuth, async (req, res) => {
   try {
+    // TURVALLISUUSKORJAUS: Varmistetaan id-rakenne ennen kantakyselyä
+    if (!req.user || !mongoose.Types.ObjectId.isValid(req.user.id)) {
+      return res.status(400).json({ success: false, message: 'Virheellinen tunnistemuoto' });
+    }
+
     // LISÄTTY: Haetaan täydet tiedot ja lokitetaan ennen evästeen poistoa
     const user = await User.findById(req.user.id);
     if (user) {
@@ -215,6 +221,11 @@ router.post('/logout', requireAuth, async (req, res) => {
 // Frontti kutsuu tätä saadakseen kirjautuneen käyttäjän tiedot
 router.get('/me', requireAuth, async (req, res) => {
   try {
+    // TURVALLISUUSKORJAUS: Varmistetaan id-rakenne ennen kantakyselyä NoSQL-injektioita vastaan
+    if (!req.user || !mongoose.Types.ObjectId.isValid(req.user.id)) {
+      return res.status(400).json({ success: false, message: 'Virheellinen tunnistemuoto' });
+    }
+
     // Hae käyttäjä id:n perusteella, ei palauteta salasanahashia
     const user = await User.findById(req.user.id).select('username role displayName');
     if (!user) {
