@@ -40,6 +40,11 @@ const questionSchema = new mongoose.Schema(
         message: 'Vähintään yksi vastaus vaaditaan',
       },
     },
+    // LISÄTTY: Monivalintavaihtoehdot (Valinnainen kenttä, puuttuu tavallisilta tekstikysymyksiltä)
+    options: {
+      type: [String],
+      default: undefined,
+    },
     // Montako yritystä pelaajalla on tähän kategoriaan
     attempts: {
       type: Number,

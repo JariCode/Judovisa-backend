@@ -163,6 +163,26 @@ const QUESTIONS = [
       'kawazu gake',
     ],
   },
+  // LISÄTTY: Kata-aiheinen monivalintakysymys (Vain 1 yritys)
+  {
+    type: 'katamenokata_ryhmat',
+    category: 'Katame-no-Kata',
+    jpName: '固の形',
+    questionText: 'Mikä on Katame-no-Katan (Matto-kata) kolmas ja viimeinen osio?',
+    attempts: 1,
+    options: ['Osaekomi-waza', 'Shime-waza', 'Kansetsu-waza'],
+    answers: ['Kansetsu-waza'],
+  },
+  // LISÄTTY: Historian ja yleistiedon monivalintakysymys (Vain 1 yritys)
+  {
+    type: 'judo_perustaja',
+    category: 'Historia',
+    jpName: '歴史',
+    questionText: 'Kuka perusti judon vuonna 1882?',
+    attempts: 1,
+    options: ['Gichin Funakoshi', 'Jigoro Kano', 'Morihei Ueshiba'],
+    answers: ['Jigoro Kano'],
+  }
 ];
 
 (async () => {

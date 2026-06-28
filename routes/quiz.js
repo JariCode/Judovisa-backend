@@ -30,9 +30,9 @@ function normalizeAnswer(s) {
 // Palauttaa kaikki aktiiviset kategoriat, mutta EI vastauksia
 router.get('/questions', requireAuth, async (req, res) => {
   try {
-    // Hae kaikki aktiiviset kysymykset, jätä answers-kenttä pois
+    // Hae kaikki aktiiviset kysymykset, otetaan mukaan options monivalintoja varten
     const questions = await Question.find({ isActive: true })
-      .select('questionText category jpName attempts') // answers EI mukana
+      .select('questionText category jpName attempts options') // LISÄTTY: options mukana!
       .lean();
 
     // Jos kysymyksiä ei löydy, ilmoita virhe
