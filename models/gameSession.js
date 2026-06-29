@@ -37,15 +37,15 @@ const sessionQuestionSchema = new mongoose.Schema(
     // Pelaajan antamat vastaukset näyttöä varten (sirujen palautus sivun päivityksessä)
     // type on 'correct', 'wrong' tai 'same'
     givenAnswers: {
-      type: [
-        {
-          text: { type: String },
-          type: { type: String },
-          _id: false,
-        },
-      ],
-      default: [],
-    },
+    type: [
+      {
+        text: { type: String },
+        status: { type: String }, // ◄ NYT NIMI ON 'status', tyyppi String
+        _id: false,
+      },
+    ],
+    default: [],
+  },
     // Onko tämä kysymys jo käsitelty loppuun (yritykset loppu tai ohitettu)
     done: {
       type: Boolean,
