@@ -88,4 +88,6 @@ const gameSessionSchema = new mongoose.Schema(
   }
 );
 
+gameSessionSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7200 }); // 2 tuntia vanhat sessiot poistetaan automaattisesti
+
 module.exports = mongoose.model('GameSession', gameSessionSchema);
