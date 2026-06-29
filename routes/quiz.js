@@ -49,7 +49,8 @@ router.get('/questions', requireAuth, async (req, res) => {
 });
 
 // ---- TARKISTA YKSITTÄINEN VASTAUS ----
-// Frontti lähettää { questionId, given }, backend palauttaa { correct: true/false }
+// Frontti lähettää { questionId, given }, backend palauttaa { correct, matchIndex }
+// matchIndex kertoo mihin vastausryhmään osuma osui, jotta frontend estää tuplapisteet
 // Oikeaa vastausta ei koskaan paljasteta
 router.post('/check', requireAuth, async (req, res) => {
   try {
@@ -75,12 +76,25 @@ router.post('/check', requireAuth, async (req, res) => {
     // Normalisoi käyttäjän vastaus
     const normalGiven = normalizeAnswer(given);
 
-    // Normalisoi kaikki hyväksytyt vastaukset joukoksi ja tarkista täsmääkö
-    const correctSet = new Set((q.answers || []).map((a) => normalizeAnswer(a)));
-    const isCorrect = correctSet.has(normalGiven);
+    // Käy vastausryhmät läpi yksi kerrallaan
+    // Yksi answers-listan alkio voi sisältää synonyymejä pystyviivalla eroteltuna
+    // esim. "juji gatame | ude hishigi juji gatame"
+    // Tällöin sama lukko hyväksytään kummalla tahansa nimellä, mutta vain yhtenä osumana
+    let matchIndex = -1;
+    for (let i = 0; i < (q.answers || []).length; i++) {
+      // Pilko ryhmä synonyymeihin pystyviivan kohdalta ja normalisoi jokainen
+      const synonyms = q.answers[i]
+        .split('|')
+        .map((s) => normalizeAnswer(s));
+      // Jos käyttäjän vastaus täsmää johonkin tämän ryhmän synonyymiin, merkitse osuma
+      if (synonyms.includes(normalGiven)) {
+        matchIndex = i;
+        break;
+      }
+    }
 
-    // Palauta vain oikeellisuus
-    res.json({ success: true, correct: isCorrect });
+    // Palauta oikeellisuus ja osuman indeksi (-1 jos väärä)
+    res.json({ success: true, correct: matchIndex !== -1, matchIndex });
   } catch (error) {
     console.error('Vastauksen tarkistus virhe:', error);
     res.status(500).json({ success: false, message: 'Palvelinvirhe' });
