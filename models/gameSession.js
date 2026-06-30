@@ -40,7 +40,7 @@ const sessionQuestionSchema = new mongoose.Schema(
     type: [
       {
         text: { type: String },
-        status: { type: String }, // ◄ NYT NIMI ON 'status', tyyppi String
+        type: { type: String }, // sirun tyyppi: 'correct', 'wrong' tai 'same'
         _id: false,
       },
     ],

@@ -210,8 +210,10 @@ router.post('/check', requireAuth, async (req, res) => {
       result = 'correct';
     }
 
-    // Tallennetaan annettu vastaus istuntodokumenttiin talteen ennen tallennusta
-    qState.givenAnswers.push({ text: given, status: result })
+    // Tallennetaan annettu vastaus istuntoon näyttöä varten (sirujen palautus sivun päivityksessä)
+    // result on 'already', mutta sirun tyyppi frontissa on 'same' - tallennetaan suoraan oikeassa muodossa
+    const chipType = result === 'already' ? 'same' : result;
+    qState.givenAnswers.push({ text: given, type: chipType });
 
     // Onko kysymys nyt valmis: yritykset loppu TAI kaikki vaaditut oikein
     if (qState.attemptsLeft <= 0 || qState.correctCount >= q.attempts) {
