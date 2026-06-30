@@ -5,8 +5,8 @@ const jwt = require('jsonwebtoken');
 
 // Middleware joka suojaa reitit kirjautuneille
 function requireAuth(req, res, next) {
-  // Lue token evästeestä
-  const token = req.cookies.token;
+  // Lue token evästeestä (?. varmistaa ettei kaadu jos cookies puuttuu)
+  const token = req.cookies?.token;
 
   // Jos tokenia ei ole, ei olla kirjautuneita
   if (!token) {

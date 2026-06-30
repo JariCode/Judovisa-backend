@@ -238,7 +238,7 @@ router.delete('/questions/:id', async (req, res) => {
   }
 });
 
-// ---- 8. LISÄTTY: PÄIVITÄ OLEMASSA OLEVA KYSYMYS ----
+// ---- 8. PÄIVITÄ OLEMASSA OLEVA KYSYMYS ----
 // Reitti: PUT /api/admin/questions/:id
 router.put('/questions/:id', async (req, res) => {
   try {
@@ -248,16 +248,25 @@ router.put('/questions/:id', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Virheellinen kysymys-id' });
     }
 
+    // INPUT-VALIDOINTI (sama kuin POST-reitissä): estetään tyhjät tai virheelliset syötteet
+    const { type, category, jpName, questionText, attempts, answers, options } = req.body;
+    if (!type || !category || !questionText || !answers || !Array.isArray(answers) || answers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Täytä kaikki pakolliset kentät ja anna vähintään yksi oikea vastaus.'
+      });
+    }
+
     const updatedQuestion = await Question.findByIdAndUpdate(
       questionId,
       {
-        type: req.body.type.toLowerCase().trim(),
-        category: req.body.category.trim(),
-        jpName: req.body.jpName ? req.body.jpName.trim() : undefined,
-        questionText: req.body.questionText.trim(),
-        attempts: parseInt(req.body.attempts, 10) || 1,
-        answers: req.body.answers,
-        options: req.body.options && req.body.options.length > 0 ? req.body.options : undefined
+        type: type.toLowerCase().trim(),
+        category: category.trim(),
+        jpName: jpName ? jpName.trim() : undefined,
+        questionText: questionText.trim(),
+        attempts: parseInt(attempts, 10) || 1,
+        answers: answers,
+        options: options && options.length > 0 ? options : undefined
       },
       { new: true }
     );
