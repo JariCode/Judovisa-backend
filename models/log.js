@@ -25,4 +25,7 @@ const logSchema = new mongoose.Schema({
   }
 });
 
+// Poistaa automaattisesti yli 12 kuukautta (365 vrk) vanhat lokimerkinnät, jottei loki kasva loputtomasti
+logSchema.index({ timestamp: 1 }, { expireAfterSeconds: 31536000 });
+
 module.exports = mongoose.models.Log || mongoose.model('Log', logSchema);
