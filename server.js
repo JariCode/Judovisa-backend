@@ -56,6 +56,21 @@ app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'Palvelin toiminnassa' });
 });
 
+// 404 - reittiä ei löytynyt. Vastataan JSONina samassa muodossa kuin muutkin virheet.
+app.use((req, res) => {
+  res.status(404).json({ success: false, message: 'Reittiä ei löytynyt' });
+});
+
+// Keskitetty virheenkäsittely - nappaa reiteistä läpi tulleet virheet yhteen paikkaan.
+app.use((err, req, res, next) => {
+  console.error('Käsittelemätön virhe:', err);
+  const isProd = process.env.NODE_ENV === 'production';
+  res.status(err.status || 500).json({
+    success: false,
+    message: isProd ? 'Palvelinvirhe' : err.message,
+  });
+});
+
 // Yhdistä tietokantaan ja käynnistä palvelin
 mongoose
   .connect(process.env.MONGODB_URI)
