@@ -10,8 +10,12 @@ const Score = require('../models/score');
 const User = require('../models/user');
 const requireAuth = require('../middleware/requireAuth');
 const GameSession = require('../models/gameSession');
+const { generalLimiter } = require('../middleware/rateLimiters');
 
 const router = express.Router();
+
+// Rate limit kaikille visan reiteille - estää massaspämmäyksen (esim. /check-vastausten arvailun botilla)
+router.use(generalLimiter);
 
 // Normalisoi vastaus vertailua varten:
 // - poistaa alku- ja loppuvälit

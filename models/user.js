@@ -43,6 +43,13 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Token-invalidointi - kasvatetaan aina kun kaikki vanhat JWT-tokenit pitää
+    // mitätöidä (uloskirjautuminen, salasanan vaihto, admin muuttaa roolia).
+    // requireAuth vertaa tätä tokenin sisällä olevaan arvoon.
+    tokenVersion: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,

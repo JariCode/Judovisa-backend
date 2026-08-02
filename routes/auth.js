@@ -185,19 +185,24 @@ router.post('/login', authLimiter, async (req, res) => {
 });
 
 // ---- ULOSKIRJAUTUMINEN ----
-// LISÄTTY: requireAuth tähän reittiin, jotta saadaan req.user lokitusta varten
+//requireAuth tähän reittiin, jotta saadaan req.user lokitusta varten
 const requireAuth = require('../middleware/requireAuth');
 
 router.post('/logout', requireAuth, async (req, res) => {
   try {
-    // TURVALLISUUSKORJAUS: Varmistetaan id-rakenne ennen kantakyselyä
+    // Varmistetaan id-rakenne ennen kantakyselyä
     if (!req.user || !mongoose.Types.ObjectId.isValid(req.user.id)) {
       return res.status(400).json({ success: false, message: 'Virheellinen tunnistemuoto' });
     }
 
-    // LISÄTTY: Haetaan täydet tiedot ja lokitetaan ennen evästeen poistoa
+    //Haetaan täydet tiedot ja lokitetaan ennen evästeen poistoa
     const user = await User.findById(req.user.id);
     if (user) {
+      // Kasvatetaan tokenVersionia - mitätöi tämän ja kaikkien muiden laitteiden
+      // vanhat tokenit heti palvelimen puolella, ei riitä että eväste poistetaan vain selaimesta
+      user.tokenVersion += 1;
+      await user.save();
+
       await logEvent('LOGOUT', user, 'Kirjautui ulos järjestelmästä.');
     }
 

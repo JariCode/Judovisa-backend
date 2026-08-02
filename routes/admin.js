@@ -11,12 +11,14 @@ const requireAuth = require('../middleware/requireAuth');
 const requireAdmin = require('../middleware/requireAdmin');
 const Log = require('../models/log');
 const logEvent = require('../utils/logger');
+const { adminLimiter } = require('../middleware/rateLimiters');
 
 const router = express.Router();
 
-// Sovelletaan molempia suojauksia kaikkiin tämän tiedoston reitteihin
+// Sovelletaan kaikkia suojauksia kaikkiin tämän tiedoston reitteihin
 router.use(requireAuth);
 router.use(requireAdmin);
+router.use(adminLimiter); // Rate limit myös admin-reiteille
 
 // ---- 1. HAE KAIKKI KÄYTTÄJÄT ----
 router.get('/users', async (req, res) => {
@@ -35,12 +37,12 @@ router.put('/users/:id/toggle-role', async (req, res) => {
   try {
     const targetId = req.params.id;
 
-    // TURVALLISUUSKORJAUS: Estetään NoSQL-injektio URL-parametrissa tarkistamalla ID-muoto ennen kantakyselyä
+    //Estetään NoSQL-injektio URL-parametrissa tarkistamalla ID-muoto ennen kantakyselyä
     if (!mongoose.Types.ObjectId.isValid(targetId)) {
       return res.status(400).json({ success: false, message: 'Virheellinen käyttäjä-id' });
     }
 
-    // ITSE SUOJELUVAISTO: Admin ei voi muuttaa omaa rooliaan
+    // Admin ei voi muuttaa omaa rooliaan
     if (targetId === req.user.id) {
       return res.status(400).json({
         success: false,
@@ -58,9 +60,14 @@ router.put('/users/:id/toggle-role', async (req, res) => {
 
     // Vaihdetaan rooli lennosta
     user.role = user.role === 'admin' ? 'player' : 'admin';
+
+    // Mitätöidään käyttäjän nykyinen token - hänen vanhassa tokenissaan on vanha rooli
+    // kiinnitettynä, joten ilman tätä hän voisi jatkaa käyttöä vanhoilla oikeuksilla siihen asti
+    // kunnes token vanhenee. Pakottaa uudelleenkirjautumisen heti.
+    user.tokenVersion += 1;
     await user.save();
 
-    // TALLENNETAAN LOKI KANTAAN ADMININ AIDOLLA NIMELLÄ
+    // TALLENNETAAN LOKI KANTAAN ADMININ NIMELLÄ
     await logEvent('ROLE_CHANGE', adminUser, `Muutti käyttäjän "${user.displayName}" rooliksi: ${user.role.toUpperCase()}`);
 
     res.json({
@@ -79,7 +86,7 @@ router.delete('/users/:id', async (req, res) => {
   try {
     const targetId = req.params.id;
 
-    // TURVALLISUUSKORJAUS: Estetään NoSQL-injektio URL-parametrissa tarkistamalla ID-muoto ennen kantakyselyä
+    // Estetään NoSQL-injektio URL-parametrissa tarkistamalla ID-muoto ennen kantakyselyä
     if (!mongoose.Types.ObjectId.isValid(targetId)) {
       return res.status(400).json({ success: false, message: 'Virheellinen käyttäjä-id' });
     }
@@ -153,7 +160,7 @@ router.post('/questions', async (req, res) => {
       });
     }
 
-    // 3. HAETAAN ADMININ TIEDOT AITOA LOKIMERKINTÄÄ VARTEN
+    // 3. HAETAAN ADMININ TIEDOT LOKIMERKINTÄÄ VARTEN
     const adminUser = await User.findById(req.user.id);
 
     // 4. LUODAAN DOKUMENTTI (Mongoose hoitaa options-kentän tallennuksen)
@@ -168,7 +175,7 @@ router.post('/questions', async (req, res) => {
       isActive: true
     });
 
-    // 5. LUODAAN AITO VIHREÄ LOKIMERKINTÄ JÄRJESTELMÄÄN
+    // 5. LUODAAN LOKIMERKINTÄ JÄRJESTELMÄÄN
     const tyyppiSuomeksi = options && options.length > 0 ? 'monivalintakysymyksen' : 'kysymyksen';
     await logEvent(
       'QUESTION_ADD', 

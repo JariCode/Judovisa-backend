@@ -10,8 +10,12 @@ const Score = require('../models/score');
 const requireAuth = require('../middleware/requireAuth');
 const { createToken, setTokenCookie } = require('../utils/tokenUtils');
 const logEvent = require('../utils/logger');
+const { generalLimiter } = require('../middleware/rateLimiters');
 
 const router = express.Router();
+
+// Rate limit kaikille profiilireiteille - estää mm. salasanan arvailun change-password-reitillä
+router.use(generalLimiter);
 
 // Syötteen validointi tunnukselle (samat säännöt kuin auth.js-tiedostossa)
 function validateUsername(username) {
@@ -37,7 +41,7 @@ router.put('/update-username', requireAuth, async (req, res) => {
       });
     }
 
-    // TURVALLISUUSKORJAUS: Varmistetaan id-rakenne ennen kantakyselyä NoSQL-injektioita vastaan
+    //Varmistetaan id-rakenne ennen kantakyselyä NoSQL-injektioita vastaan
     if (!req.user || !mongoose.Types.ObjectId.isValid(req.user.id)) {
       return res.status(400).json({ success: false, message: 'Virheellinen tunnistemuoto' });
     }
@@ -67,7 +71,7 @@ router.put('/update-username', requireAuth, async (req, res) => {
     // Päivitetään myös Score-tauluun uusi displayName, jotta Top 10 pysyy ajan tasalla lennosta
     await Score.updateMany({ userId: user._id }, { displayName: user.displayName });
 
-    // LISÄTTY: Lokitetaan tunnuksen muutos
+    //Lokitetaan tunnuksen muutos
     await logEvent('UPDATE_USERNAME', user, `Muutti käyttäjätunnuksekseen: ${oldDisplayName} -> ${newUsername}`);
 
     // Luodaan uusi JWT-token ja asetetaan uusi eväste
@@ -98,7 +102,7 @@ router.put('/change-password', requireAuth, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Uusi salasana: vähintään 8 merkkiä' });
     }
 
-    // TURVALLISUUSKORJAUS: Varmistetaan id-rakenne ennen kantakyselyä NoSQL-injektioita vastaan
+    //Varmistetaan id-rakenne ennen kantakyselyä NoSQL-injektioita vastaan
     if (!req.user || !mongoose.Types.ObjectId.isValid(req.user.id)) {
       return res.status(400).json({ success: false, message: 'Virheellinen tunnistemuoto' });
     }
@@ -117,10 +121,19 @@ router.put('/change-password', requireAuth, async (req, res) => {
 
     // Hashataan uusi salasana (12 kierrosta)
     user.passwordHash = await bcrypt.hash(newPassword, 12);
+
+    // Kasvatetaan tokenVersionia - mitätöi kaikki muut mahdolliset avoimet istunnot
+    // (esim. varastettu token toisella laitteella) heti salasanan vaihdon yhteydessä
+    user.tokenVersion += 1;
     await user.save();
 
-    // LISÄTTY: Lokitetaan salasanan vaihto
+    // Lokitetaan salasanan vaihto
     await logEvent('CHANGE_PASSWORD', user, 'Vaihtoi tilinsä salasanan.');
+
+    // Luodaan uusi token nykyiselle istunnolle, jotta käyttäjä pysyy itse kirjautuneena
+    // sisään vaikka vanha tokenVersion mitätöitiin edellä
+    const token = createToken(user);
+    setTokenCookie(res, token);
 
     res.json({ success: true, message: 'Salasana vaihdettu onnistuneesti' });
   } catch (error) {
@@ -138,7 +151,7 @@ router.delete('/delete-account', requireAuth, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Salasana vaaditaan tilin poistamiseksi' });
     }
 
-    // TURVALLISUUSKORJAUS: Varmistetaan id-rakenne ennen kantakyselyä NoSQL-injektioita vastaan
+    //Varmistetaan id-rakenne ennen kantakyselyä NoSQL-injektioita vastaan
     if (!req.user || !mongoose.Types.ObjectId.isValid(req.user.id)) {
       return res.status(400).json({ success: false, message: 'Virheellinen tunnistemuoto' });
     }
@@ -148,7 +161,7 @@ router.delete('/delete-account', requireAuth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Käyttäjää ei löytynyt' });
     }
 
-    // TURVALLISUUSTARKISTUS: Admin ei voi poistaa omaa tiliään profiilisivulta
+    // Admin ei voi poistaa omaa tiliään profiilisivulta
     if (user.role === 'admin') {
       return res.status(403).json({
         success: false,
@@ -162,7 +175,7 @@ router.delete('/delete-account', requireAuth, async (req, res) => {
       return res.status(401).json({ success: false, message: 'Salasana on virheellinen' });
     }
 
-    // LISÄTTY: Lokitetaan oman tilin poisto ennen tuhoamista
+    //Lokitetaan oman tilin poisto ennen tuhoamista
     await logEvent('DELETE_ACCOUNT', user, 'Poisti oman käyttäjätilinsä ja kaikki pelituloksensa pysyvästi.');
 
     // Poistetaan kaikki käyttäjän suorittamat pelitulokset Score-kannasta

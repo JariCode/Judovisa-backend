@@ -6,6 +6,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const helmet = require('helmet');
 
 const authRoutes = require('./routes/auth');
 const quizRoutes = require('./routes/quiz');
@@ -17,6 +18,16 @@ const PORT = process.env.PORT || 5000;
 
 // Render ja muut proxyt - luota proxyyn jotta IP saadaan oikein rate-limitiä varten
 app.set('trust proxy', 1);
+
+// Helmet - asettaa turvalliset HTTP-otsikot (mm. X-Content-Type-Options, X-Frame-Options, HSTS)
+// contentSecurityPolicy pois päältä: tämä on puhdas JSON-API, ei renderöi HTML/JS-sisältöä,
+// joten CSP-direktiivit eivät koske mitään täällä palvelinpuolella
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' }, // sallitaan frontin fetch-kutsut eri originista
+  })
+);
 
 // CORS - sallitaan vain määritellyt originit, evästeet mukaan. Haetaan environmetistä ALLOWED_ORIGINS.
 const allowedOrigins = process.env.ALLOWED_ORIGINS
