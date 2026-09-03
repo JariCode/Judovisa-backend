@@ -16,9 +16,9 @@ const { adminLimiter } = require('../middleware/rateLimiters');
 const router = express.Router();
 
 // Sovelletaan kaikkia suojauksia kaikkiin tämän tiedoston reitteihin
+router.use(adminLimiter);
 router.use(requireAuth);
 router.use(requireAdmin);
-router.use(adminLimiter); // Rate limit myös admin-reiteille
 
 // ---- 1. HAE KAIKKI KÄYTTÄJÄT ----
 router.get('/users', async (req, res) => {

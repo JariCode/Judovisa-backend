@@ -9,6 +9,7 @@ const mongoose = require('mongoose'); // LISÄTTY: Tarvitaan id-muodon validoint
 const User = require('../models/user');
 const { createToken, setTokenCookie } = require('../utils/tokenUtils');
 const logEvent = require('../utils/logger');
+const { generalLimiter } = require('../middleware/rateLimiters');
 
 const router = express.Router();
 
@@ -188,7 +189,7 @@ router.post('/login', authLimiter, async (req, res) => {
 //requireAuth tähän reittiin, jotta saadaan req.user lokitusta varten
 const requireAuth = require('../middleware/requireAuth');
 
-router.post('/logout', requireAuth, async (req, res) => {
+router.post('/logout', generalLimiter, requireAuth, async (req, res) => {
   try {
     // Varmistetaan id-rakenne ennen kantakyselyä
     if (!req.user || !mongoose.Types.ObjectId.isValid(req.user.id)) {
@@ -224,7 +225,7 @@ router.post('/logout', requireAuth, async (req, res) => {
 
 // ---- KUKA ON KIRJAUTUNUT ----
 // Frontti kutsuu tätä saadakseen kirjautuneen käyttäjän tiedot
-router.get('/me', requireAuth, async (req, res) => {
+router.get('/me', generalLimiter, requireAuth, async (req, res) => {
   try {
     // TURVALLISUUSKORJAUS: Varmistetaan id-rakenne ennen kantakyselyä NoSQL-injektioita vastaan
     if (!req.user || !mongoose.Types.ObjectId.isValid(req.user.id)) {
