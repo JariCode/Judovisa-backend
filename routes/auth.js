@@ -238,7 +238,7 @@ router.get('/me', generalLimiter, requireAuth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Käyttäjää ei löytynyt' });
     }
     // Palauta perustiedot
-    res.json({ success: true, user: { username: user.username, role: user.role, displayName: user.displayName } });
+    res.json({ success: true, user: { id: user._id, username: user.username, role: user.role, displayName: user.displayName } });
   } catch (error) {
     console.error('Me-reitin virhe:', error);
     res.status(500).json({ success: false, message: 'Palvelinvirhe' });
