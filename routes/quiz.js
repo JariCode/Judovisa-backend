@@ -242,6 +242,58 @@ router.post('/check', requireAuth, async (req, res) => {
   }
 });
 
+// ---- OHITA KYSYMYS (sessiopohjainen) ----
+// Merkitsee kysymyksen käsitellyksi vaikuttamatta pisteisiin tai jäljellä oleviin yrityksiin,
+// jotta sivun päivityksen jälkeen peli jatkuu oikeasta kohdasta eikä palaa jo ohitettuun kysymykseen
+router.post('/skip', requireAuth, async (req, res) => {
+  try {
+    // Lue session id ja kysymyksen id
+    const { sessionId, questionId } = req.body;
+
+    // Tarkista syötteiden olemassaolo
+    if (!sessionId || !questionId) {
+      return res.status(400).json({ success: false, message: 'sessionId ja questionId vaaditaan' });
+    }
+
+    // Tarkista id-muodot NoSQL-injektiota vastaan
+    if (!mongoose.Types.ObjectId.isValid(sessionId) || !mongoose.Types.ObjectId.isValid(questionId)) {
+      return res.status(400).json({ success: false, message: 'Virheellinen id-muoto' });
+    }
+
+    // Hae sessio
+    const session = await GameSession.findById(sessionId);
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Sessiota ei löytynyt' });
+    }
+
+    // Tarkista että sessio kuuluu tälle pelaajalle
+    if (session.userId.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Tämä ei ole sinun pelisessiosi' });
+    }
+
+    // Tarkista että sessio on vielä käynnissä
+    if (session.status !== 'active') {
+      return res.status(400).json({ success: false, message: 'Peli on jo päättynyt' });
+    }
+
+    // Etsi tämän kysymyksen tila sessiosta
+    const qState = session.questions.find((sq) => sq.questionId.toString() === questionId);
+    if (!qState) {
+      return res.status(400).json({ success: false, message: 'Kysymys ei kuulu tähän peliin' });
+    }
+
+    // Merkitään käsitellyksi: ei vaikuta correctCountiin tai attemptsLeftiin,
+    // joten ohitus ei tuota pisteitä eikä laske vääräksi lopullisessa pisteytyksessä
+    qState.done = true;
+    await session.save();
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Kysymyksen ohitus virhe:', error);
+    res.status(500).json({ success: false, message: 'Palvelinvirhe' });
+  }
+});
+
 // ---- HAE SESSION NYKYTILA ----
 // Frontti kutsuu tätä esim. sivun päivityksen jälkeen jatkaakseen keskeneräistä peliä
 // Palauttaa kysymysten tilan mutta EI vastauksia
