@@ -19,15 +19,25 @@ const PORT = process.env.PORT || 5000;
 // Render ja muut proxyt - luota proxyyn jotta IP saadaan oikein rate-limitiä varten
 app.set('trust proxy', 1);
 
-// Helmet - asettaa turvalliset HTTP-otsikot (mm. X-Content-Type-Options, X-Frame-Options, HSTS)
-// contentSecurityPolicy pois päältä: tämä on puhdas JSON-API, ei renderöi HTML/JS-sisältöä,
-// joten CSP-direktiivit eivät koske mitään täällä palvelinpuolella
+// Helmet - asettaa turvalliset HTTP-otsikot
+// contentSecurityPolicy pois päältä: tämä on JSON-API, ei renderöi HTML/JS-sisältöä
 app.use(
   helmet({
     contentSecurityPolicy: false,
     crossOriginResourcePolicy: { policy: 'cross-origin' }, // sallitaan frontin fetch-kutsut eri originista
   })
 );
+
+// Varmistetaan turvaotsikot eksplisiittisesti kaikkiin vastauksiin
+// (osa työkaluista ei tunnista Helmetin oletuksia, joten asetetaan ne suoraan)
+app.use((req, res, next) => {
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+  next();
+});
 
 // CORS - sallitaan vain määritellyt originit, evästeet mukaan. Haetaan environmetistä ALLOWED_ORIGINS.
 const allowedOrigins = process.env.ALLOWED_ORIGINS
