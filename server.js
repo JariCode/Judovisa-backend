@@ -12,6 +12,11 @@ const authRoutes = require('./routes/auth');
 const quizRoutes = require('./routes/quiz');
 const profileRoutes = require('./routes/profile');
 const adminRoutes = require('./routes/admin');
+const {
+  createCsrfToken,
+  setCsrfCookie,
+  csrfProtection,
+} = require('./middleware/csrfProtection');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -48,12 +53,23 @@ app.use(
   cors({
     origin: allowedOrigins,
     credentials: true, // evästeet mukaan pyynnöissä
+    allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
   })
 );
 
 // Lue JSON-runko, rajaa koko haitallisten suurten pyyntöjen estämiseksi
 app.use(express.json({ limit: '10kb' }));
 app.use(cookieParser());
+
+// CSRF-token voidaan hakea ennen kirjautumista ja rekisteröitymistä.
+app.get('/api/csrf-token', (req, res) => {
+  const token = createCsrfToken();
+  setCsrfCookie(res, token);
+  res.json({ success: true, token });
+});
+
+// Suojaa kaikki tilaa muuttavat API-pyynnöt, myös kirjautumisen ja rekisteröitymisen.
+app.use(csrfProtection);
 
 // Reitit
 app.use('/api/auth', authRoutes);
